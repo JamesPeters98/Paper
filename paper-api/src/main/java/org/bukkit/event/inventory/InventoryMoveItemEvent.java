@@ -1,6 +1,7 @@
 package org.bukkit.event.inventory;
 
 import com.google.common.base.Preconditions;
+import java.util.function.Predicate;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -8,6 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Called when some entity or block (e.g. hopper) tries to move items directly
@@ -35,6 +37,7 @@ public class InventoryMoveItemEvent extends Event implements Cancellable {
     private final boolean didSourceInitiate;
 
     private boolean cancelled;
+    private Predicate<ItemStack> skipUntil;
 
     @ApiStatus.Internal
     public InventoryMoveItemEvent(@NotNull final Inventory sourceInventory, @NotNull final ItemStack itemStack, @NotNull final Inventory destinationInventory, final boolean didSourceInitiate) {
@@ -107,6 +110,32 @@ public class InventoryMoveItemEvent extends Event implements Cancellable {
     @Override
     public void setCancelled(boolean cancel) {
         this.cancelled = cancel;
+        this.skipUntil = null;
+    }
+
+    /**
+     * Cancels this event and lets the hopper move the next item that passes
+     * {@code next} instead. Items that fail it are skipped without calling
+     * this event, and calling this again adds another test they must pass.
+     * <p>
+     * Only hopper blocks support this; anything else treats it as a normal
+     * cancellation. {@link #setCancelled(boolean)} undoes it.
+     *
+     * @param next the test the next item must pass
+     */
+    public void skipUntil(@NotNull Predicate<? super ItemStack> next) {
+        Preconditions.checkArgument(next != null, "Predicate cannot be null");
+        final Predicate<ItemStack> previous = this.skipUntil;
+        this.cancelled = true;
+        this.skipUntil = previous == null ? next::test : item -> previous.test(item) && next.test(item);
+    }
+
+    /**
+     * {@return the test set by {@link #skipUntil(Predicate)}, or null if this event isn't skipping}
+     */
+    @Nullable
+    public Predicate<ItemStack> getSkipUntil() {
+        return this.skipUntil;
     }
 
     @NotNull
