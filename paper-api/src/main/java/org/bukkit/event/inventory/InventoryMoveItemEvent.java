@@ -35,6 +35,7 @@ public class InventoryMoveItemEvent extends Event implements Cancellable {
     private final boolean didSourceInitiate;
 
     private boolean cancelled;
+    private boolean skipItem;
 
     @ApiStatus.Internal
     public InventoryMoveItemEvent(@NotNull final Inventory sourceInventory, @NotNull final ItemStack itemStack, @NotNull final Inventory destinationInventory, final boolean didSourceInitiate) {
@@ -104,9 +105,44 @@ public class InventoryMoveItemEvent extends Event implements Cancellable {
         return this.cancelled;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This also undoes {@link #skipItem()}.
+     */
     @Override
     public void setCancelled(boolean cancel) {
         this.cancelled = cancel;
+        this.skipItem = false;
+    }
+
+    /**
+     * Cancels this event and lets a hopper try the next item instead.
+     * <p>
+     * Normally, cancelling this event ends the hopper's transfer attempt.
+     * With this method, a hopper pulling items moves on to the next slot of
+     * the source inventory, and a hopper pushing items moves on to the next
+     * slot of the hopper. A new event is called for each item tried. If no
+     * item is moved, the hopper goes on cooldown as if this event was
+     * cancelled.
+     * <p>
+     * A later call to {@link #setCancelled(boolean)} undoes this, so a
+     * listener that cancels the event outright always ends the attempt.
+     * Hopper minecarts and other initiators treat this as a normal
+     * cancellation.
+     */
+    public void skipItem() {
+        this.cancelled = true;
+        this.skipItem = true;
+    }
+
+    /**
+     * Gets whether this event has been cancelled with {@link #skipItem()}.
+     *
+     * @return whether the item is skipped
+     */
+    public boolean isItemSkipped() {
+        return this.skipItem;
     }
 
     @NotNull
